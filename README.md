@@ -13,15 +13,17 @@ audio streaming protocol, initially based on the constraints of Asterisk audio.
 Each packet contains a three-byte header and a variable payload.  The header is
 composed of a one-byte type and a two-byte length indicator.
 
+The minimum message length is three bytes:  type and payload-length.  Hangup
+indication, for instance, is `0x00 0x00 0x00`.
 
 ### Types
 
-  - `0x00` - Payload will contain the UUID (36-byte string representation) for the audio stream
-  - `0x01` - An error has occurred; payload is the (optional)
+  - `0x00` - Terminate the connection (socket closure is also sufficient)
+  - `0x01` - Payload will contain the UUID (36-byte string representation) for the audio stream
+  - `0x10` - Payload is Signed linear, 16-bit, 8kHz, mono PCM
+  - `0xff` - An error has occurred; payload is the (optional)
     application-specific error code.  Asterisk-generated error codes are listed
     below.
-  - `0x10` - Payload is Signed linear, 16-bit, 8kHz, mono PCM
-  - `0xff` - Terminate the connection (socket closure is also sufficient)
 
 ### Payload length
 
