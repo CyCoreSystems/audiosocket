@@ -19,8 +19,8 @@ indication, for instance, is `0x00 0x00 0x00`.
 ### Types
 
   - `0x00` - Terminate the connection (socket closure is also sufficient)
-  - `0x01` - Payload will contain the UUID (36-byte string representation) for the audio stream
-  - `0x10` - Payload is Signed linear, 16-bit, 8kHz, mono PCM
+  - `0x01` - Payload will contain the UUID (16-byte binary representation) for the audio stream
+  - `0x10` - Payload is signed linear, 16-bit, 8kHz, mono PCM (little-endian)
   - `0xff` - An error has occurred; payload is the (optional)
     application-specific error code.  Asterisk-generated error codes are listed
     below.
