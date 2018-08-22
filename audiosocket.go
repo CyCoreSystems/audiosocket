@@ -2,8 +2,10 @@ package audiosocket
 
 import (
 	"encoding/binary"
+	"io"
 
-	"github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
+	"github.com/pkg/errors"
 )
 
 // Message describes an audiosocket message/packet
@@ -18,6 +20,9 @@ const (
 
 	// KindID indicates the message contains the unique identifier of the call
 	KindID = 0x01
+
+	// KindSilence indicates the presence of silence on the line
+	KindSilence = 0x02
 
 	// KindSlin indicates the message contains signed-linear audio data
 	KindSlin = 0x10
@@ -79,6 +84,35 @@ func (m Message) Payload() []byte {
 	}
 
 	return m[3:]
+}
+
+// NextMessage reads and parses the next message from an audiosocket connection
+func NextMessage(r io.Reader) (Message, error) {
+	hdr := make([]byte, 3)
+
+	n, err := r.Read(hdr)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read header")
+	}
+	if n != 3 {
+		return nil, errors.Wrapf(err, "read wrong number of bytes (%d) for header", n)
+	}
+
+	payloadLen := binary.BigEndian.Uint16(hdr[1:])
+	if payloadLen < 1 {
+		return hdr, nil
+	}
+
+	payload := make([]byte, payloadLen)
+	n, err = r.Read(payload)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read header")
+	}
+	if n != int(payloadLen) {
+		return nil, errors.Wrapf(err, "read wrong number of bytes (%d) for payload", n)
+	}
+
+	return append(hdr, payload...), nil
 }
 
 // MessageFromData parses an audiosocket message into a Message
