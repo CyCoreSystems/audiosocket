@@ -23,18 +23,17 @@
 	<support_level>core</support_level>
  ***/
 
-#include "errno.h"
-#include <stdio.h>
-#include <uuid/uuid.h>
 #include "asterisk.h"
+#include "errno.h"
+#include <uuid/uuid.h>
 
-#include "asterisk/app.h"
 #include "asterisk/file.h"
-#include "asterisk/format_cache.h"
 #include "asterisk/module.h"
 #include "asterisk/channel.h"
+#include "asterisk/app.h"
 #include "asterisk/uuid.h"
 #include "asterisk/utils.h"
+#include "asterisk/format_cache.h"
 
 #define AST_MODULE "app_audiosocket"
 //#define AST_MODULE_SELF "app_audiosocket"
