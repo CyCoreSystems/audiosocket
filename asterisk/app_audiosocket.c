@@ -24,6 +24,7 @@
  ***/
 
 #include "errno.h"
+#include <stdio.h>
 #include <uuid/uuid.h>
 #include "asterisk.h"
 
