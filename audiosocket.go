@@ -54,8 +54,7 @@ func (m Message) ContentLength() uint16 {
 		return 0
 	}
 
-	return binary.BigEndian.Uint16(m[1:2])
-
+	return binary.BigEndian.Uint16(m[1:3])
 }
 
 // Kind returns the type of the message
@@ -103,16 +102,18 @@ func NextMessage(r io.Reader) (Message, error) {
 		return hdr, nil
 	}
 
-	payload := make([]byte, payloadLen)
+	payload := make([]byte, payloadLen, payloadLen)
 	n, err = r.Read(payload)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read header")
+		return nil, errors.Wrap(err, "failed to read payload")
 	}
 	if n != int(payloadLen) {
 		return nil, errors.Wrapf(err, "read wrong number of bytes (%d) for payload", n)
 	}
 
-	return append(hdr, payload...), nil
+	m := append(hdr, payload...)
+
+	return m, nil
 }
 
 // MessageFromData parses an audiosocket message into a Message

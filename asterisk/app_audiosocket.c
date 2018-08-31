@@ -51,13 +51,8 @@
 			</parameter>
       </syntax>
 		<syntax>
-			<parameter name="hostname" required="true">
-            <para>Hostname is the name or IP address of the audio socket service to which this call should be connected.</para>
-			</parameter>
-      </syntax>
-		<syntax>
-			<parameter name="port" required="true">
-            <para>Port is the port number on which the audio socket service is running and to which this call should be connected.</para>
+			<parameter name="service" required="true">
+            <para>Service is the name or IP address and port number of the audio socket service to which this call should be connected.  This should be in the form host:port, such as myserver:9019 </para>
 			</parameter>
       </syntax>
 		<description>
@@ -125,17 +120,19 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
 			continue;
 		}
 
-      if (ast_connect(s, &addrs[i])) {
+      if (ast_connect(s, &addrs[i]) && errno == EINPROGRESS) {
 
 			if (handle_audiosocket_connection(args.service, addrs[i], s)) {
 				close(s);
 				continue;
-			} else {
-            ast_log(LOG_ERROR, "Connection to %s failed with unexpected error: %s\n",
-                  ast_sockaddr_stringify(&addrs[i]), strerror(errno));
-         }
+			}
 
+      } else {
+         ast_log(LOG_ERROR, "Connection to %s failed with unexpected error: %s\n",
+               ast_sockaddr_stringify(&addrs[i]), strerror(errno));
       }
+
+      break;
    }
    ast_free(addrs);
 
@@ -144,6 +141,7 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
       return -1;
    }
 
+   ast_verbose("running audiosocket\n");
    audiosocket_run(chan, id, s);
    close(s);
 
@@ -205,14 +203,15 @@ static int audiosocket_init(const uuid_t id, const int svc) {
    uint8_t *buf = ast_malloc(3+16);
 
    buf[0] = 0x01;
-   buf[1] = 0x10;
-   buf[2] = 0x00;
+   buf[1] = 0x00;
+   buf[2] = 0x10;
    memcpy(buf+3, id, 16);
 
    if(write(svc, buf, 3+16) != 3+16) {
       ast_log(LOG_WARNING, "Failed to write data to audiosocket");
       ret = 1;
    }
+   ast_verbose("wrote id packet");
 
    ast_free(buf);
    return ret;
@@ -221,12 +220,18 @@ static int audiosocket_init(const uuid_t id, const int svc) {
 static int audiosocket_send_frame(const int svc, const struct ast_frame *f) {
 
    int ret = 0;
-   void *buf;
+   uint8_t kind = 0x10;
+   uint8_t *buf, *p;
 
    buf = ast_malloc(3 + f->datalen);
-   memcpy(buf+3, f->data.ptr, f->datalen);
+   p = buf;
 
-   if(write(svc, buf, 3+16) != 3+16) {
+   *(p++) = kind;
+   *(p++) = f->datalen >> 8;
+   *(p++) = f->datalen & 0xff;
+   memcpy(p, f->data.ptr, f->datalen);
+
+   if(write(svc, buf, 3+f->datalen) != 3+f->datalen) {
       ast_log(LOG_WARNING, "Failed to write data to audiosocket");
       ret = 1;
    }
@@ -235,14 +240,38 @@ static int audiosocket_send_frame(const int svc, const struct ast_frame *f) {
    return ret;
 }
 
+/*
+static uint8_t* pack_uint8(uint8_t* dest, uint8_t src) {
+   *(dest++) = src;
+   return dest;
+}
+
+static uint8_t* pack_uint16be(uint8_t* dest, uint16_t src) {
+   *(dest++) = src >> 8;
+   *(dest++) = src & 0xff;
+   return dest;
+}
+
+static uint16_t unpack_uint16be(uint8_t* src) {
+   uint16_t out = 0;
+   out += src[0] * 256;
+   out += src[1];
+   return 1;
+}
+*/
+
+/* audiosocket_forward_frame reads a message from the audiosocket and forwards it to the asterisk channel */
 static int audiosocket_forward_frame(const int svc, struct ast_channel *chan) {
 
    int i = 0, n = 0, ret = 0;;
+   int not_audio = 0;
 	struct ast_frame f;
 
    uint8_t kind;
-   uint16_t len;
-   void *data;
+   uint8_t len_high;
+   uint8_t len_low;
+   uint16_t len = 0;
+   uint8_t* data;
 
    n = read(svc, &kind, 1);
    if (n < 0 && errno == EAGAIN) {
@@ -252,19 +281,34 @@ static int audiosocket_forward_frame(const int svc, struct ast_channel *chan) {
       return 0;
    }
    if (n != 1) {
-      ast_log(LOG_WARNING, "Failed to read type header from audiosocket");
+      ast_log(LOG_WARNING, "Failed to read type header from audiosocket\n");
       return 1;
    }
    if (kind != 0x10) {
-      // ignore non-audio message
-      ast_log(LOG_WARNING, "Received non-audio audiosocket message");
-      return 0;
+      // read but ignore non-audio message
+      ast_log(LOG_WARNING, "Received non-audio audiosocket message\n");
+      not_audio = 1;
+   } else {
+      ast_verbose("Received audio from audiosocket\n");
    }
 
-   n = read(svc, &len, 2);
-   if (n != 2) {
-      ast_log(LOG_WARNING, "Failed to read data length from audiosocket");
+   n = read(svc, &len_high, 1);
+   if (n != 1) {
+      ast_log(LOG_WARNING, "Failed to read data length from audiosocket\n");
       return 2;
+   }
+   len += len_high * 256;
+   n = read(svc, &len_low, 1);
+   if (n != 1) {
+      ast_log(LOG_WARNING, "Failed to read data length from audiosocket\n");
+      return 2;
+   }
+   len += len_low;
+
+   ast_verbose("length of data %d\n", len);
+
+   if (len < 1) {
+      return 0;
    }
 
    data = ast_malloc(len);
@@ -274,12 +318,12 @@ static int audiosocket_forward_frame(const int svc, struct ast_channel *chan) {
    while (i < len) {
       n = read(svc, data+i, len-i);
       if (n < 0) {
-         ast_log(LOG_ERROR, "Failed to read data from audiosocket");
+         ast_log(LOG_ERROR, "Failed to read data from audiosocket\n");
          ret = n;
          break;
       }
       if (n == 0) {
-         ast_log(LOG_ERROR, "Insufficient data read from audiosocket");
+         ast_log(LOG_ERROR, "Insufficient data read from audiosocket\n");
          ret = -1;
          break;
       }
@@ -290,9 +334,13 @@ static int audiosocket_forward_frame(const int svc, struct ast_channel *chan) {
       return ret;
    }
 
+   if(not_audio) {
+      return 0;
+   }
+
 	f = (struct ast_frame){
 		.frametype = AST_FRAME_VOICE,
-		.subclass.format = ast_format_slin16,
+		.subclass.format = ast_format_slin,
 		.src = "AudioSocket",
 		.data.ptr = data,
 		.datalen = len,
@@ -300,42 +348,51 @@ static int audiosocket_forward_frame(const int svc, struct ast_channel *chan) {
       .mallocd = AST_MALLOCD_DATA,
 	};
 
-   ast_queue_frame(chan, &f);
-
-   return 0;
+   return ast_write(chan, &f);
 }
 
 static int audiosocket_run(struct ast_channel *chan, const uuid_t id, const int svc) {
+
+   if (ast_set_write_format(chan, ast_format_slin)) {
+      ast_log(LOG_ERROR, "Failed to set write format to SLINEAR\n");
+      return 1;
+   }
+   if (ast_set_read_format(chan, ast_format_slin)) {
+      ast_log(LOG_ERROR, "Failed to set read format to SLINEAR\n");
+      return 1;
+   }
 
    if (audiosocket_init(id, svc)) {
       return 1;
    }
 
 	while (ast_waitfor(chan, -1) > -1) {
-		struct ast_frame *f = ast_read(chan);
-		if (!f) {
-			break;
-		}
-		f->delivery.tv_sec = 0;
-		f->delivery.tv_usec = 0;
-      if (f->frametype != AST_FRAME_VOICE) {
-         ast_frfree(f);
-         break;
-      }
 
-      // Send audio frame to audiosocket
-      if(audiosocket_send_frame(svc, f)) {
+		struct ast_frame *f = ast_read(chan);
+		if (f) {
+         f->delivery.tv_sec = 0;
+         f->delivery.tv_usec = 0;
+         if (f->frametype != AST_FRAME_VOICE) {
+            ast_verbose("Ignoring non-voice frame\n");
+         } else {
+
+            // Send audio frame to audiosocket
+            if(audiosocket_send_frame(svc, f)) {
+               ast_log(LOG_ERROR, "Failed to forward channel frame to audiosocket\n");
+               ast_frfree(f);
+               break;
+            }
+         }
+
          ast_frfree(f);
-         break;
       }
 
       // Send audiosocket data to channel
       if(audiosocket_forward_frame(svc, chan)) {
-         ast_frfree(f);
+         ast_log(LOG_ERROR, "Failed to forward audiosocket message to channel\n");
          break;
       }
 
-      ast_frfree(f);
 	}
 	return 0;
 }
