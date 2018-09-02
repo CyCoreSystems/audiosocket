@@ -364,7 +364,7 @@ static int audiosocket_run(struct ast_channel *chan, const uuid_t id, const int 
       return 1;
    }
 
-	while (ast_waitfor(chan, -1) > CHANNEL_INPUT_TIMEOUT_MS) {
+	while (ast_waitfor(chan, CHANNEL_INPUT_TIMEOUT_MS) > -1) {
 
       // Check channel state
       if( ast_channel_state(chan) != AST_STATE_UP ) {
