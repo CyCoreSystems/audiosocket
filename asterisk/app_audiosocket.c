@@ -368,6 +368,12 @@ static int audiosocket_run(struct ast_channel *chan, const uuid_t id, const int 
 
 	while (ast_waitfor(chan, -1) > -1) {
 
+      // Check channel state
+      if( ast_channel_state(chan) != AST_STATE_UP ) {
+         ast_verbose("Channel hung up\n");
+         return 0;
+      }
+
 		struct ast_frame *f = ast_read(chan);
 		if (f) {
          f->delivery.tv_sec = 0;
