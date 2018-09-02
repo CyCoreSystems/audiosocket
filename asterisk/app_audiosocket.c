@@ -288,8 +288,6 @@ static int audiosocket_forward_frame(const int svc, struct ast_channel *chan) {
       // read but ignore non-audio message
       ast_log(LOG_WARNING, "Received non-audio audiosocket message\n");
       not_audio = 1;
-   } else {
-      ast_verbose("Received audio from audiosocket\n");
    }
 
    n = read(svc, &len_high, 1);
@@ -304,8 +302,6 @@ static int audiosocket_forward_frame(const int svc, struct ast_channel *chan) {
       return 2;
    }
    len += len_low;
-
-   ast_verbose("length of data %d\n", len);
 
    if (len < 1) {
       return 0;
