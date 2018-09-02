@@ -144,6 +144,7 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
    ast_verbose("running audiosocket\n");
    audiosocket_run(chan, id, s);
    close(s);
+   ast_verbose("exiting audiosocket\n");
 
    return 0;
 }
@@ -382,7 +383,7 @@ static int audiosocket_run(struct ast_channel *chan, const uuid_t id, const int 
             if(audiosocket_send_frame(svc, f)) {
                ast_log(LOG_ERROR, "Failed to forward channel frame to audiosocket\n");
                ast_frfree(f);
-               break;
+               return 1;
             }
          }
 
@@ -392,7 +393,7 @@ static int audiosocket_run(struct ast_channel *chan, const uuid_t id, const int 
       // Send audiosocket data to channel
       if(audiosocket_forward_frame(svc, chan)) {
          ast_log(LOG_ERROR, "Failed to forward audiosocket message to channel\n");
-         break;
+         return 1;
       }
 
 	}
