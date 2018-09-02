@@ -39,6 +39,7 @@
 //#define AST_MODULE_SELF "app_audiosocket"
 #define AUDIOSOCKET_CONFIG "audiosocket.conf"
 #define MAX_CONNECT_TIMEOUT_MSEC 2000
+#define CHANNEL_INPUT_TIMEOUT_MS 5000
 
 /*** DOCUMENTATION
 	<application name="AudioSocket" language="en_US">
@@ -363,7 +364,7 @@ static int audiosocket_run(struct ast_channel *chan, const uuid_t id, const int 
       return 1;
    }
 
-	while (ast_waitfor(chan, -1) > -1) {
+	while (ast_waitfor(chan, -1) > CHANNEL_INPUT_TIMEOUT_MS) {
 
       // Check channel state
       if( ast_channel_state(chan) != AST_STATE_UP ) {
