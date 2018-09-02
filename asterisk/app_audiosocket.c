@@ -213,7 +213,7 @@ static int audiosocket_init(const uuid_t id, const int svc) {
       ast_log(LOG_WARNING, "Failed to write data to audiosocket");
       ret = 1;
    }
-   ast_verbose("wrote id packet");
+   ast_verbose("wrote id packet\n");
 
    ast_free(buf);
    return ret;
