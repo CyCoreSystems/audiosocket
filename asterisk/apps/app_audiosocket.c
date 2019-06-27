@@ -20,6 +20,7 @@
  */
 
 /*** MODULEINFO
+	<depend>res_audiosocket</depend>
 	<support_level>core</support_level>
  ***/
 
@@ -175,4 +176,10 @@ static int load_module(void)
    return ast_register_application_xml(app, audiosocket_exec);
 }
 
-AST_MODULE_INFO_STANDARD(ASTERISK_GPL_KEY, "AudioSocket Application");
+AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_LOAD_ORDER, "AudioSocket Application",
+	.support_level = AST_MODULE_SUPPORT_CORE,
+	.load = load_module,
+	.unload = unload_module,
+	.load_pri = AST_MODPRI_CHANNEL_DRIVER,
+	.requires = "res_audiosocket",
+);
