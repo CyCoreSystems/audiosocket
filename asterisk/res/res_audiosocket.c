@@ -149,7 +149,7 @@ static int handle_audiosocket_connection(const char *server, const struct ast_so
 
 const int audiosocket_init(const int svc, struct ast_uuid *id) {
    uuid_t uu;
-   char idBuf[AST_UUID_STR_LEN];
+   char idBuf[AST_UUID_STR_LEN+1];
 
    ast_verbose("checking for UUID\n");
    /*
