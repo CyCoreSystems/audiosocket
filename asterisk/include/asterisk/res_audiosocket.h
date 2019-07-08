@@ -47,7 +47,7 @@ const int audiosocket_connect(const char *server);
  * \retval 0 on success
  * \retval -1 on error
  */
-const int audiosocket_init(const int svc, struct ast_uuid *id);
+const int audiosocket_init(const int svc, const char *id);
 
 /*!
  * \brief Send an Asterisk audio frame to an AudioSocket server

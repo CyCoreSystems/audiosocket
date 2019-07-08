@@ -147,17 +147,26 @@ static int handle_audiosocket_connection(const char *server, const struct ast_so
 	return 0;
 }
 
-const int audiosocket_init(const int svc, struct ast_uuid *id) {
+const int audiosocket_init(const int svc, const char *id) {
    uuid_t uu;
-   char idBuf[AST_UUID_STR_LEN+1];
+   //char idBuf[AST_UUID_STR_LEN+1];
 
    ast_verbose("checking for UUID\n");
+   if (ast_strlen_zero(id)) {
+      ast_log(LOG_ERROR, "No UUID for AudioSocket");
+      return -1;
+   }
+   ast_verbose("parsing UUID '%s'\n",id);
+
+   if (uuid_parse(id, uu)) {
+      ast_log(LOG_ERROR, "Failed to parse UUID '%s'\n", id);
+      return -1;
+   }
    /*
    if (ast_uuid_is_nil(id)) {
       ast_log(LOG_WARNING, "No UUID for AudioSocket");
       return -1;
    }
-   */
 
    // FIXME: this is ridiculous, but we cannot see inside ast_uuid to extract
    // the underlying bytes; thus, we parse the string again.  
@@ -167,8 +176,10 @@ const int audiosocket_init(const int svc, struct ast_uuid *id) {
       ast_log(LOG_ERROR, "Failed to parse UUID");
       return -1;
    }
+   */
 
 
+   ast_verbose("allocating init message\n");
    int ret = 0;
    uint8_t *buf = ast_malloc(3+16);
 

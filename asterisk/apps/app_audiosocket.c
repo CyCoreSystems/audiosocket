@@ -70,7 +70,7 @@
 static const char app[] = "AudioSocket";
 
 static int audiosocket_exec(struct ast_channel *chan, const char *data);
-static int audiosocket_run(struct ast_channel *chan, struct ast_uuid *id, const int svc);
+static int audiosocket_run(struct ast_channel *chan, const char *id, const int svc);
 
 static int audiosocket_exec(struct ast_channel *chan, const char *data)
 {
@@ -82,7 +82,7 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
    );
 
    int s = 0;
-   struct ast_uuid *id;
+   struct ast_uuid *id = NULL;
 
    /* Parse and validate arguments */
    parse = ast_strdupa(data);
@@ -100,14 +100,14 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
    }
 
    ast_verbose("running AudioSocket '%s'\n", args.idStr);
-   audiosocket_run(chan, id, s);
+   audiosocket_run(chan, args.idStr, s);
    close(s);
    ast_verbose("exiting audiosocket '%s'\n", args.idStr);
 
    return 0;
 }
 
-static int audiosocket_run(struct ast_channel *chan, struct ast_uuid *id, const int svc) {
+static int audiosocket_run(struct ast_channel *chan, const char *id, const int svc) {
 
    if (ast_set_write_format(chan, ast_format_slin)) {
       ast_log(LOG_ERROR, "Failed to set write format to SLINEAR\n");

@@ -36,7 +36,7 @@
 #include "asterisk/format_cache.h"
 
 struct audiosocket_instance {
-   struct ast_uuid *id;
+   const char *id;
    int svc;
 };
 
@@ -151,7 +151,10 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
       ast_log(LOG_ERROR, "UUID '%s' could not be parsed\n", args.idStr);
       goto failure;
    }
-   instance.id = id;
+   ast_free(id);
+   ast_verbose("parsed UUID '%s'\n", args.idStr);
+   instance.id = ast_strdup(args.idStr);
+   //instance.id = args.idStr;
 
 	if(ast_format_cap_iscompatible_format(cap, ast_format_slin) == AST_FORMAT_CMP_NOT_EQUAL) {
 		struct ast_str *cap_buf = ast_str_alloca(AST_FORMAT_CAP_NAMES_LEN);
