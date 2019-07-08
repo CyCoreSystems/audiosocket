@@ -152,10 +152,12 @@ const int audiosocket_init(const int svc, struct ast_uuid *id) {
    char idBuf[AST_UUID_STR_LEN];
 
    ast_verbose("checking for UUID\n");
+   /*
    if (ast_uuid_is_nil(id)) {
       ast_log(LOG_WARNING, "No UUID for AudioSocket");
       return -1;
    }
+   */
 
    // FIXME: this is ridiculous, but we cannot see inside ast_uuid to extract
    // the underlying bytes; thus, we parse the string again.  
