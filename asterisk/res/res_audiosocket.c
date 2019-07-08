@@ -151,7 +151,7 @@ const int audiosocket_init(const int svc, const char *id) {
    uuid_t uu;
    //char idBuf[AST_UUID_STR_LEN+1];
 
-   ast_verbose("checking for UUID\n");
+   ast_verbose("checking for UUID '%s'\n", id);
    if (ast_strlen_zero(id)) {
       ast_log(LOG_ERROR, "No UUID for AudioSocket");
       return -1;
@@ -180,6 +180,7 @@ const int audiosocket_init(const int svc, const char *id) {
 
 
    ast_verbose("allocating init message\n");
+   usleep(100);
    int ret = 0;
    uint8_t *buf = ast_malloc(3+16);
 
