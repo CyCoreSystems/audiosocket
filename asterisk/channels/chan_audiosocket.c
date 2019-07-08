@@ -120,7 +120,7 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
 	struct audiosocket_instance instance;
 	struct ast_sockaddr address;
 	struct ast_channel *chan;
-   struct ast_uuid *id;
+   struct ast_uuid *id = NULL;
    int fd;
 	AST_DECLARE_APP_ARGS(args,
 		AST_APP_ARG(destination);
