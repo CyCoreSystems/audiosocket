@@ -36,9 +36,9 @@
 #include "asterisk/format_cache.h"
 
 struct audiosocket_instance {
-   const char *id;
    int svc;
-};
+   char id[38];
+} audiosocket_instance;
 
 /* Forward declarations */
 static struct ast_channel *audiosocket_request(const char *type, struct ast_format_cap *cap, const struct ast_assigned_ids *assignedids, const struct ast_channel *requestor, const char *data, int *cause);
@@ -96,6 +96,8 @@ static int audiosocket_call(struct ast_channel *ast, const char *dest, int timeo
       return -1;
    }
 
+   ast_verbose("retrieved AudioSocket instance (%s)(%d)\n", instance->id, instance->svc);
+
    return audiosocket_init(instance->svc, instance->id);
 }
 
@@ -117,7 +119,7 @@ static int audiosocket_hangup(struct ast_channel *ast)
 static struct ast_channel *audiosocket_request(const char *type, struct ast_format_cap *cap, const struct ast_assigned_ids *assignedids, const struct ast_channel *requestor, const char *data, int *cause)
 {
 	char *parse;
-	struct audiosocket_instance instance;
+	struct audiosocket_instance *instance;
 	struct ast_sockaddr address;
 	struct ast_channel *chan;
    struct ast_uuid *id = NULL;
@@ -138,7 +140,7 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
 		ast_log(LOG_ERROR, "Destination is required for the 'AudioSocket' channel\n");
 		goto failure;
 	}
-	if (!ast_sockaddr_parse(&address, args.destination, PARSE_PORT_REQUIRE)) {
+	if (ast_sockaddr_resolve_first_af(&address, args.destination, PARSE_PORT_REQUIRE, AST_AF_UNSPEC)) {
 		ast_log(LOG_ERROR, "Destination '%s' could not be parsed\n", args.destination);
 		goto failure;
 	}
@@ -153,7 +155,10 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
    }
    ast_free(id);
    ast_verbose("parsed UUID '%s'\n", args.idStr);
-   instance.id = ast_strdup(args.idStr);
+
+   instance = ast_calloc(1, sizeof(*instance));
+   ast_copy_string(instance->id, args.idStr, sizeof(instance->id));
+
    //instance.id = args.idStr;
 
 	if(ast_format_cap_iscompatible_format(cap, ast_format_slin) == AST_FORMAT_CMP_NOT_EQUAL) {
@@ -168,7 +173,7 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
       ast_log(LOG_ERROR, "Failed to connect to AudioSocket server at '%s'\n", args.destination);
       goto failure;
    }
-   instance.svc = fd;
+   instance->svc = fd;
 
 	chan = ast_channel_alloc(1, AST_STATE_DOWN, "", "", "", "", "", assignedids,
 		requestor, 0, "AudioSocket/%s-%s", args.destination, args.idStr);
@@ -185,7 +190,9 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
 	ast_channel_set_readformat(chan, ast_format_slin);
 	ast_channel_set_rawreadformat(chan, ast_format_slin);
 
-	ast_channel_tech_pvt_set(chan, &instance);
+	ast_channel_tech_pvt_set(chan, instance);
+
+   ast_verbose("stored UUID '%s'\n", instance->id);
 
 	pbx_builtin_setvar_helper(chan, "AUDIOSOCKET_UUID", args.idStr);
 	pbx_builtin_setvar_helper(chan, "AUDIOSOCKET_SERVICE", args.destination);
