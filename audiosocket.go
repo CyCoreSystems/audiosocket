@@ -85,6 +85,14 @@ func (m Message) Payload() []byte {
 	return m[3:]
 }
 
+// ID returns the session's unique ID if and only if the Message is the initial ID message
+func (m Message) ID() (uuid.UUID, error) {
+	if m.Kind() != KindID {
+		return uuid.Nil, errors.Errorf("wrong message type %d", m.Kind())
+	}
+	return uuid.FromBytes(m.Payload())
+}
+
 // NextMessage reads and parses the next message from an audiosocket connection
 func NextMessage(r io.Reader) (Message, error) {
 	hdr := make([]byte, 3)
