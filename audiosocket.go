@@ -85,6 +85,27 @@ func (m Message) Payload() []byte {
 	return m[3:]
 }
 
+// ID returns the session's unique ID if and only if the Message is the initial
+// ID message.  Normally, you would call GetID on the socket instead of
+// manually running this function.
+func (m Message) ID() (uuid.UUID, error) {
+	if m.Kind() != KindID {
+		return uuid.Nil, errors.Errorf("wrong message type %d", m.Kind())
+	}
+	return uuid.FromBytes(m.Payload())
+}
+
+// GetID reads the unique ID from the first Message received.  This should only
+// be called once per connection, and it must be called before anything else is
+// read from the connection.
+func GetID(r io.Reader) (uuid.UUID, error) {
+	m, err := NextMessage(r)
+	if err != nil {
+		return uuid.Nil, errors.Wrap(err, "failed to read message")
+	}
+	return m.ID()
+}
+
 // NextMessage reads and parses the next message from an audiosocket connection
 func NextMessage(r io.Reader) (Message, error) {
 	hdr := make([]byte, 3)
