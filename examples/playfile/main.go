@@ -50,6 +50,7 @@ func main() {
 		log.Fatalln("failed to read audio file:", err)
 	}
 
+	log.Println("listening for AudioSocket connections on", listenAddr)
 	if err = Listen(ctx); err != nil {
 		log.Fatalln("listen failure:", err)
 	}
