@@ -52,8 +52,6 @@
 			<parameter name="uuid" required="true">
             <para>UUID is the universally-unique identifier of the call for the audio socket service.  This ID must conform to the string form of a standard UUID.</para>
 			</parameter>
-      </syntax>
-		<syntax>
 			<parameter name="service" required="true">
             <para>Service is the name or IP address and port number of the audio socket service to which this call should be connected.  This should be in the form host:port, such as myserver:9019 </para>
 			</parameter>
@@ -121,13 +119,14 @@ static int audiosocket_run(struct ast_channel *chan, const char *id, const int s
    }
 
 	while (ast_waitfor(chan, CHANNEL_INPUT_TIMEOUT_MS) > -1) {
+      struct ast_frame *f = NULL;
 
       // Check channel state
       if( ast_channel_state(chan) != AST_STATE_UP ) {
          return 0;
       }
 
-		struct ast_frame *f = ast_read(chan);
+		f = ast_read(chan);
       if(!f) {
          ast_log(LOG_WARNING, "No frame received\n");
          return 1;

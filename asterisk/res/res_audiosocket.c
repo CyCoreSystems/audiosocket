@@ -144,6 +144,9 @@ static int handle_audiosocket_connection(const char *server, const struct ast_so
 
 const int audiosocket_init(const int svc, const char *id) {
    uuid_t uu;
+   int ret = 0;
+   uint8_t *buf = NULL;
+
    //char idBuf[AST_UUID_STR_LEN+1];
 
    if (ast_strlen_zero(id)) {
@@ -157,8 +160,7 @@ const int audiosocket_init(const int svc, const char *id) {
    }
 
    usleep(100);
-   int ret = 0;
-   uint8_t *buf = ast_malloc(3+16);
+   buf = ast_malloc(3+16);
 
    buf[0] = 0x01;
    buf[1] = 0x00;
@@ -199,8 +201,7 @@ const int audiosocket_send_frame(const int svc, const struct ast_frame *f) {
 
 struct ast_frame *audiosocket_receive_frame(const int svc) {
 
-   int i = 0, n = 0, ret = 0;;
-   int not_audio = 0;
+   int i = 0, n = 0, ret = 0, not_audio = 0;
 	static struct ast_frame f;
 
    uint8_t kind;
