@@ -70,7 +70,6 @@ const int audiosocket_connect(const char *server) {
 
       if (ast_connect(s, &addrs[i]) && errno == EINPROGRESS) {
 
-         ast_verbose("attempting to handle connected socket\n");
 			if (handle_audiosocket_connection(server, addrs[i], s)) {
 				close(s);
 				continue;
@@ -90,7 +89,6 @@ const int audiosocket_connect(const char *server) {
       return -1;
    }
 
-   ast_verbose("connected to AudioSocket\n");
    return s;
 }
 
@@ -116,7 +114,6 @@ static int handle_audiosocket_connection(const char *server, const struct ast_so
 	pfds[0].fd = netsockfd;
 	pfds[0].events = POLLOUT;
 
-   ast_verbose("polling AudioSocket connection\n");
 	while ((res = ast_poll(pfds, 1, MAX_CONNECT_TIMEOUT_MSEC)) != 1) {
 		if (errno != EINTR) {
 			if (!res) {
@@ -130,14 +127,12 @@ static int handle_audiosocket_connection(const char *server, const struct ast_so
 		}
 	}
 
-   ast_verbose("setting AudioSocket options\n");
 	if (getsockopt(pfds[0].fd, SOL_SOCKET, SO_ERROR, &conresult, &reslen) < 0) {
 		ast_log(LOG_WARNING, "Connection to %s failed with error: %s\n",
 			ast_sockaddr_stringify(&addr), strerror(errno));
 		return -1;
 	}
 
-   ast_verbose("checking result\n");
 	if (conresult) {
 		ast_log(LOG_WARNING, "Connecting to '%s' failed for url '%s': %s\n",
 			ast_sockaddr_stringify(&addr), server, strerror(conresult));
@@ -151,35 +146,16 @@ const int audiosocket_init(const int svc, const char *id) {
    uuid_t uu;
    //char idBuf[AST_UUID_STR_LEN+1];
 
-   ast_verbose("checking for UUID '%s'\n", id);
    if (ast_strlen_zero(id)) {
       ast_log(LOG_ERROR, "No UUID for AudioSocket");
       return -1;
    }
-   ast_verbose("parsing UUID '%s'\n",id);
 
    if (uuid_parse(id, uu)) {
       ast_log(LOG_ERROR, "Failed to parse UUID '%s'\n", id);
       return -1;
    }
-   /*
-   if (ast_uuid_is_nil(id)) {
-      ast_log(LOG_WARNING, "No UUID for AudioSocket");
-      return -1;
-   }
 
-   // FIXME: this is ridiculous, but we cannot see inside ast_uuid to extract
-   // the underlying bytes; thus, we parse the string again.  
-   //
-   ast_verbose("validating UUID\n");
-   if (uuid_parse(ast_uuid_to_str(id, idBuf, AST_UUID_STR_LEN), uu)) {
-      ast_log(LOG_ERROR, "Failed to parse UUID");
-      return -1;
-   }
-   */
-
-
-   ast_verbose("allocating init message\n");
    usleep(100);
    int ret = 0;
    uint8_t *buf = ast_malloc(3+16);
@@ -189,12 +165,10 @@ const int audiosocket_init(const int svc, const char *id) {
    buf[2] = 0x10;
    memcpy(buf+3, uu, 16);
 
-   ast_verbose("sending initialization packet\n");
    if (write(svc, buf, 3+16) != 3+16) {
       ast_log(LOG_WARNING, "Failed to write data to audiosocket");
       ret = -1;
    }
-   ast_verbose("wrote id packet\n");
 
    ast_free(buf);
    return ret;
@@ -244,6 +218,10 @@ struct ast_frame *audiosocket_receive_frame(const int svc) {
    }
    if (n != 1) {
       ast_log(LOG_WARNING, "Failed to read type header from audiosocket\n");
+      return NULL;
+   }
+   if (kind == 0x00) {
+      // AudioSocket ended by remote
       return NULL;
    }
    if (kind != 0x10) {

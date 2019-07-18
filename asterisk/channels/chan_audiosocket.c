@@ -96,8 +96,6 @@ static int audiosocket_call(struct ast_channel *ast, const char *dest, int timeo
       return -1;
    }
 
-   ast_verbose("retrieved AudioSocket instance (%s)(%d)\n", instance->id, instance->svc);
-
    return audiosocket_init(instance->svc, instance->id);
 }
 
@@ -154,7 +152,6 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
       goto failure;
    }
    ast_free(id);
-   ast_verbose("parsed UUID '%s'\n", args.idStr);
 
    instance = ast_calloc(1, sizeof(*instance));
    ast_copy_string(instance->id, args.idStr, sizeof(instance->id));
@@ -191,8 +188,6 @@ static struct ast_channel *audiosocket_request(const char *type, struct ast_form
 	ast_channel_set_rawreadformat(chan, ast_format_slin);
 
 	ast_channel_tech_pvt_set(chan, instance);
-
-   ast_verbose("stored UUID '%s'\n", instance->id);
 
 	pbx_builtin_setvar_helper(chan, "AUDIOSOCKET_UUID", args.idStr);
 	pbx_builtin_setvar_helper(chan, "AUDIOSOCKET_SERVICE", args.destination);

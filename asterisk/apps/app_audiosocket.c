@@ -99,10 +99,8 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
       ast_log(LOG_ERROR, "failed to connect to AudioSocket\n");
    }
 
-   ast_verbose("running AudioSocket '%s'\n", args.idStr);
    audiosocket_run(chan, args.idStr, s);
    close(s);
-   ast_verbose("exiting audiosocket '%s'\n", args.idStr);
 
    return 0;
 }
@@ -126,7 +124,6 @@ static int audiosocket_run(struct ast_channel *chan, const char *id, const int s
 
       // Check channel state
       if( ast_channel_state(chan) != AST_STATE_UP ) {
-         ast_verbose("Channel hung up\n");
          return 0;
       }
 
@@ -138,9 +135,7 @@ static int audiosocket_run(struct ast_channel *chan, const char *id, const int s
 
       f->delivery.tv_sec = 0;
       f->delivery.tv_usec = 0;
-      if (f->frametype != AST_FRAME_VOICE) {
-         ast_verbose("Ignoring non-voice frame\n");
-      } else {
+      if (f->frametype == AST_FRAME_VOICE) {
 
          // Send audio frame to audiosocket
          if(audiosocket_send_frame(svc, f)) {
