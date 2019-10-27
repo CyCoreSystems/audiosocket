@@ -5,8 +5,8 @@
 AudioSocket is a simple TCP-based protocol for sending and receiving realtime
 audio streams.
 
-There exists a protocol definition (below), a Go library, and an Asterisk
-application.
+There exists a protocol definition (below), a Go library, and Asterisk
+application and channel interfaces.
 
 ## Protocol definition
 

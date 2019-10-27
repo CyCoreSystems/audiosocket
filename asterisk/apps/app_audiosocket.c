@@ -1,9 +1,15 @@
 /*
- * app_audiosocket
+ * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 2018, CyCore Systems, Inc.
+ * Copyright (C) 2019, CyCore Systems, Inc
  *
  * Seán C McCord <scm@cycoresys.com>
+ *
+ * See http://www.asterisk.org for more information about
+ * the Asterisk project. Please do not directly contact
+ * any of the maintainers of this project for assistance;
+ * the project provides a web site, mailing lists and IRC
+ * channels for your use.
  *
  * This program is free software, distributed under the terms of
  * the GNU General Public License Version 2. See the LICENSE file
@@ -21,7 +27,7 @@
 
 /*** MODULEINFO
 	<depend>res_audiosocket</depend>
-	<support_level>core</support_level>
+	<support_level>extended</support_level>
  ***/
 
 #include "asterisk.h"
@@ -38,7 +44,6 @@
 #include "asterisk/format_cache.h"
 
 #define AST_MODULE "app_audiosocket"
-//#define AST_MODULE_SELF "app_audiosocket"
 #define AUDIOSOCKET_CONFIG "audiosocket.conf"
 #define MAX_CONNECT_TIMEOUT_MSEC 2000
 #define CHANNEL_INPUT_TIMEOUT_MS 5000
@@ -67,95 +72,115 @@
 
 static const char app[] = "AudioSocket";
 
-static int audiosocket_exec(struct ast_channel *chan, const char *data);
 static int audiosocket_run(struct ast_channel *chan, const char *id, const int svc);
 
 static int audiosocket_exec(struct ast_channel *chan, const char *data)
 {
-   char *parse;
+	char *parse;
+    struct ast_format *readFormat,*writeFormat;
 
-   AST_DECLARE_APP_ARGS(args,
-         AST_APP_ARG(idStr);
-         AST_APP_ARG(server);
-   );
+	AST_DECLARE_APP_ARGS(args,
+        AST_APP_ARG(idStr);
+        AST_APP_ARG(server);
+    );
 
-   int s = 0;
-   struct ast_uuid *id = NULL;
+	int s = 0;
+	struct ast_uuid *id = NULL;
 
-   /* Parse and validate arguments */
-   parse = ast_strdupa(data);
-   AST_STANDARD_APP_ARGS(args, parse);
-   if (ast_strlen_zero(args.idStr)) {
-      ast_log(LOG_ERROR, "UUID is required\n");
-      return -1;
-   }
-   if ( (id = ast_str_to_uuid(args.idStr)) == NULL ) {
-      ast_log(LOG_ERROR, "UUID '%s' could not be parsed\n", args.idStr);
-      return -1;
-   }
-   if( (s = audiosocket_connect(args.server)) < 0 ) {
-      ast_log(LOG_ERROR, "failed to connect to AudioSocket\n");
-   }
+    if (ast_channel_state(chan) != AST_STATE_UP) {
+        ast_log(LOG_WARNING, "AudioSocket cannot continue if channel not UP");
+        return -1;
+    }
 
-   audiosocket_run(chan, args.idStr, s);
-   close(s);
+	/* Parse and validate arguments */
+	parse = ast_strdupa(data);
+	AST_STANDARD_APP_ARGS(args, parse);
+	if (ast_strlen_zero(args.idStr)) {
+		ast_log(LOG_ERROR, "UUID is required\n");
+		return -1;
+	}
+	if ((id = ast_str_to_uuid(args.idStr)) == NULL) {
+		ast_log(LOG_ERROR, "UUID '%s' could not be parsed\n", args.idStr);
+		return -1;
+	}
+	if ((s = ast_audiosocket_connect(args.server, chan)) < 0) {
+		ast_log(LOG_ERROR, "failed to connect to AudioSocket\n");
+        return -1;
+	}
 
-   return 0;
+    writeFormat = ast_channel_writeformat(chan);
+    readFormat = ast_channel_readformat(chan);
+	if (ast_set_write_format(chan, ast_format_slin)) {
+		ast_log(LOG_ERROR, "failed to set write format to SLINEAR\n");
+		return -1;
+	}
+	if (ast_set_read_format(chan, ast_format_slin)) {
+		ast_log(LOG_ERROR, "failed to set read format to SLINEAR\n");
+
+        /* Attempt to restore previous write format even though it is likely to
+           fail, since setting the read format did.
+        */
+        if (ast_set_write_format(chan, writeFormat)) {
+            ast_log(LOG_ERROR, "failed to restore write format\n");
+        }
+		return -1;
+	}
+
+	audiosocket_run(chan, args.idStr, s);
+	close(s);
+
+    if (ast_set_write_format(chan, writeFormat)) {
+        ast_log(LOG_ERROR, "failed to store write format\n");
+    }
+    if (ast_set_read_format(chan, readFormat)) {
+        ast_log(LOG_ERROR, "failed to store read format\n");
+    }
+
+	return 0;
 }
 
-static int audiosocket_run(struct ast_channel *chan, const char *id, const int svc) {
+static int audiosocket_run(struct ast_channel *chan, const char *id, const int svc)
+{
+    if (ast_channel_state(chan) != AST_STATE_UP) {
+        return 0;
+    }
 
-   if (ast_set_write_format(chan, ast_format_slin)) {
-      ast_log(LOG_ERROR, "Failed to set write format to SLINEAR\n");
-      return 1;
-   }
-   if (ast_set_read_format(chan, ast_format_slin)) {
-      ast_log(LOG_ERROR, "Failed to set read format to SLINEAR\n");
-      return 1;
-   }
 
-   if (audiosocket_init(svc, id)) {
-      return 1;
-   }
+	if (ast_audiosocket_init(svc, id)) {
+		return 1;
+	}
 
 	while (ast_waitfor(chan, CHANNEL_INPUT_TIMEOUT_MS) > -1) {
-      struct ast_frame *f = NULL;
-
-      // Check channel state
-      if( ast_channel_state(chan) != AST_STATE_UP ) {
-         return 0;
-      }
+		struct ast_frame *f = NULL;
 
 		f = ast_read(chan);
-      if(!f) {
-         ast_log(LOG_WARNING, "No frame received\n");
-         return 1;
-      }
+		if (!f) {
+			return 0;
+		}
 
-      f->delivery.tv_sec = 0;
-      f->delivery.tv_usec = 0;
-      if (f->frametype == AST_FRAME_VOICE) {
+		if (f->frametype == AST_FRAME_VOICE) {
 
-         // Send audio frame to audiosocket
-         if(audiosocket_send_frame(svc, f)) {
-            ast_log(LOG_ERROR, "Failed to forward channel frame to audiosocket\n");
+			/* Send audio frame to audiosocket */
+			if (ast_audiosocket_send_frame(svc, f)) {
+				ast_log(LOG_ERROR, "failed to forward channel frame to AudioSocket\n");
+				ast_frfree(f);
+				return 1;
+			}
+		}
+
+		ast_frfree(f);
+
+		/* Send audiosocket data to channel */
+		if (!(f = ast_audiosocket_receive_frame(svc))) {
+			ast_log(LOG_ERROR, "failed to receive frame from AudioSocket message\n");
+			return 1;
+		}
+		if (ast_write(chan, f)) {
+			ast_log(LOG_WARNING, "failed to forward frame to channel\n");
             ast_frfree(f);
-            return 1;
-         }
-      }
-
-      ast_frfree(f);
-
-      // Send audiosocket data to channel
-      if(!(f = audiosocket_receive_frame(svc))) {
-         ast_log(LOG_ERROR, "Failed to receive frame from audiosocket message\n");
-         return 1;
-      }
-      if(ast_write(chan, f)) {
-         ast_log(LOG_WARNING, "Failed to forward frame to channel\n");
-         return 1;
-      }
-
+			return 1;
+		}
+        ast_frfree(f);
 	}
 	return 0;
 }
@@ -167,13 +192,16 @@ static int unload_module(void)
 
 static int load_module(void)
 {
-   return ast_register_application_xml(app, audiosocket_exec);
+	return ast_register_application_xml(app, audiosocket_exec);
 }
 
-AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_LOAD_ORDER, "AudioSocket Application",
-	.support_level = AST_MODULE_SUPPORT_CORE,
-	.load = load_module,
-	.unload = unload_module,
-	.load_pri = AST_MODPRI_CHANNEL_DRIVER,
-	.requires = "res_audiosocket",
+AST_MODULE_INFO(
+    ASTERISK_GPL_KEY,
+    AST_MODFLAG_LOAD_ORDER,
+    "AudioSocket Application",
+    .support_level = AST_MODULE_SUPPORT_EXTENDED,
+    .load =	load_module,
+    .unload = unload_module,
+    .load_pri =	AST_MODPRI_CHANNEL_DRIVER,
+    .requires = "res_audiosocket",
 );
