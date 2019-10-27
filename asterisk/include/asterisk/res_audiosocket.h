@@ -40,7 +40,7 @@ extern "C" {
  * \brief Send the initial message to an AudioSocket server
  *
  * \param server The server address, including port.
- * \param server An optional channel which will be put into autoservice during
+ * \param chan An optional channel which will be put into autoservice during
  * the connection period.  If there is no channel to be autoserviced, pass NULL
  * instead.
  *

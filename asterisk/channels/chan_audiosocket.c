@@ -35,7 +35,6 @@
 
 #include "asterisk/channel.h"
 #include "asterisk/module.h"
-#include "asterisk/uuid.h"
 #include "asterisk/res_audiosocket.h"
 #include "asterisk/pbx.h"
 #include "asterisk/acl.h"
@@ -43,17 +42,17 @@
 #include "asterisk/causes.h"
 #include "asterisk/format_cache.h"
 
+#define FD_OUTPUT 1	/* A fd of -1 means an error, 0 is stdin */
+
 struct audiosocket_instance {
-	int svc;
-	char id[38];
+	int svc;	/* The file descriptor for the AudioSocket instance */
+	char id[38];	/* The UUID identifying this AudioSocket instance */
 } audiosocket_instance;
 
 /* Forward declarations */
 static struct ast_channel *audiosocket_request(const char *type,
-											   struct ast_format_cap *cap,
-											   const struct ast_assigned_ids *assignedids,
-											   const struct ast_channel *requestor,
-											   const char *data, int *cause);
+	struct ast_format_cap *cap, const struct ast_assigned_ids *assignedids,
+	const struct ast_channel *requestor, const char *data, int *cause);
 static int audiosocket_call(struct ast_channel *ast, const char *dest, int timeout);
 static int audiosocket_hangup(struct ast_channel *ast);
 static struct ast_frame *audiosocket_read(struct ast_channel *ast);
@@ -73,9 +72,11 @@ static struct ast_channel_tech audiosocket_channel_tech = {
 /*! \brief Function called when we should read a frame from the channel */
 static struct ast_frame *audiosocket_read(struct ast_channel *ast)
 {
-	struct audiosocket_instance *instance = ast_channel_tech_pvt(ast);
+	struct audiosocket_instance *instance;
 
-	if (instance == NULL || instance->svc < 1) {
+	/* The channel should always be present from the API */
+	instance = ast_channel_tech_pvt(ast);
+	if (instance == NULL || instance->svc < FD_OUTPUT) {
 		return NULL;
 	}
 	return ast_audiosocket_receive_frame(instance->svc);
@@ -84,8 +85,10 @@ static struct ast_frame *audiosocket_read(struct ast_channel *ast)
 /*! \brief Function called when we should write a frame to the channel */
 static int audiosocket_write(struct ast_channel *ast, struct ast_frame *f)
 {
-	struct audiosocket_instance *instance = ast_channel_tech_pvt(ast);
+	struct audiosocket_instance *instance;
 
+	/* The channel should always be present from the API */
+	instance = ast_channel_tech_pvt(ast);
 	if (instance == NULL || instance->svc < 1) {
 		return -1;
 	}
@@ -99,48 +102,41 @@ static int audiosocket_call(struct ast_channel *ast, const char *dest, int timeo
 
 	ast_queue_control(ast, AST_CONTROL_ANSWER);
 
-	if (ast_set_write_format(ast, ast_format_slin)) {
-		ast_log(LOG_ERROR, "Failed to set write format to SLINEAR\n");
-		return -1;
-	}
-	if (ast_set_read_format(ast, ast_format_slin)) {
-		ast_log(LOG_ERROR, "Failed to set read format to SLINEAR\n");
-		return -1;
-	}
-
 	return ast_audiosocket_init(instance->svc, instance->id);
 }
 
 /*! \brief Function called when we should hang the channel up */
 static int audiosocket_hangup(struct ast_channel *ast)
 {
-	struct audiosocket_instance *instance = ast_channel_tech_pvt(ast);
+	struct audiosocket_instance *instance;
 
+	/* The channel should always be present from the API */
+	instance = ast_channel_tech_pvt(ast);
 	if (instance != NULL && instance->svc > 0) {
 		close(instance->svc);
 	}
 
 	ast_channel_tech_pvt_set(ast, NULL);
+	ast_free(instance);
 
 	return 0;
 }
 
 /*! \brief Function called when we should prepare to call the unicast destination */
 static struct ast_channel *audiosocket_request(const char *type,
-											   struct ast_format_cap *cap,
-											   const struct ast_assigned_ids *assignedids,
-											   const struct ast_channel *requestor,
-											   const char *data, int *cause)
+	struct ast_format_cap *cap, const struct ast_assigned_ids *assignedids,
+	const struct ast_channel *requestor, const char *data, int *cause)
 {
 	char *parse;
 	struct audiosocket_instance *instance = NULL;
 	struct ast_sockaddr address;
 	struct ast_channel *chan;
-	struct ast_uuid *id = NULL;
+    uuid_t uu;
 	int fd;
-	AST_DECLARE_APP_ARGS(args, AST_APP_ARG(destination);
-						 AST_APP_ARG(idStr);
-		);
+	AST_DECLARE_APP_ARGS(args,
+		AST_APP_ARG(destination);
+		AST_APP_ARG(idStr);
+	);
 
 	if (ast_strlen_zero(data)) {
 		ast_log(LOG_ERROR, "Destination is required for the 'AudioSocket' channel\n");
@@ -163,11 +159,10 @@ static struct ast_channel *audiosocket_request(const char *type,
 		ast_log(LOG_ERROR, "UUID is required for the 'AudioSocket' channel\n");
 		goto failure;
 	}
-	if ((id = ast_str_to_uuid(args.idStr)) == NULL) {
-		ast_log(LOG_ERROR, "UUID '%s' could not be parsed\n", args.idStr);
+	if (uuid_parse(args.idStr, uu)) {
+		ast_log(LOG_ERROR, "Failed to parse UUID '%s'\n", args.idStr);
 		goto failure;
 	}
-	ast_free(id);
 
 	instance = ast_calloc(1, sizeof(*instance));
 	if (!instance) {
@@ -176,29 +171,13 @@ static struct ast_channel *audiosocket_request(const char *type,
 	}
 	ast_copy_string(instance->id, args.idStr, sizeof(instance->id));
 
-	if (ast_format_cap_iscompatible_format(cap, ast_format_slin) ==
-		AST_FORMAT_CMP_NOT_EQUAL) {
-		struct ast_str *cap_buf = ast_str_alloca(AST_FORMAT_CAP_NAMES_LEN);
-		if (cap_buf<0) {
-			ast_log(LOG_ERROR, "Failed to allocate AudioSocket capabilities buffer\n");
-			goto failure;
-		}
-
-		ast_log(LOG_NOTICE, "Asked to get a channel of unsupported format '%s'\n",
-				ast_format_cap_get_names(cap, &cap_buf));
-		goto failure;
-	}
-
 	if ((fd = ast_audiosocket_connect(args.destination, NULL)) < 0) {
-		ast_log(LOG_ERROR, "Failed to connect to AudioSocket server at '%s'\n",
-				args.destination);
 		goto failure;
 	}
 	instance->svc = fd;
 
 	chan = ast_channel_alloc(1, AST_STATE_DOWN, "", "", "", "", "", assignedids,
-							 requestor, 0, "AudioSocket/%s-%s", args.destination,
-							 args.idStr);
+		requestor, 0, "AudioSocket/%s-%s", args.destination, args.idStr);
 	if (!chan) {
 		goto failure;
 	}
@@ -219,16 +198,16 @@ static struct ast_channel *audiosocket_request(const char *type,
 
 	ast_channel_unlock(chan);
 
-    if (instance != NULL) {
-        ast_free(instance);
-    }
 	return chan;
 
-  failure:
+failure:
 	*cause = AST_CAUSE_FAILURE;
-    if (instance != NULL) {
-        ast_free(instance);
-    }
+	if (instance != NULL) {
+		ast_free(instance);
+		if (fd >= 0) {
+			close(fd);
+		}
+	}
 	return NULL;
 }
 
@@ -245,9 +224,7 @@ static int unload_module(void)
 /*! \brief Function called when our module is loaded */
 static int load_module(void)
 {
-	if (!
-		(audiosocket_channel_tech.capabilities =
-		 ast_format_cap_alloc(AST_FORMAT_CAP_FLAG_DEFAULT))) {
+	if (!(audiosocket_channel_tech.capabilities = ast_format_cap_alloc(AST_FORMAT_CAP_FLAG_DEFAULT))) {
 		return AST_MODULE_LOAD_DECLINE;
 	}
 	ast_format_cap_append(audiosocket_channel_tech.capabilities, ast_format_slin, 0);
@@ -262,10 +239,10 @@ static int load_module(void)
 }
 
 AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_LOAD_ORDER,
-    "AudioSocket Channel",
-    .support_level = AST_MODULE_SUPPORT_EXTENDED,
-    .load = load_module,
-    .unload = unload_module,
-    .load_pri = AST_MODPRI_CHANNEL_DRIVER,
-    .requires = "res_audiosocket",
+	"AudioSocket Channel",
+	.support_level = AST_MODULE_SUPPORT_EXTENDED,
+	.load = load_module,
+	.unload = unload_module,
+	.load_pri = AST_MODPRI_CHANNEL_DRIVER,
+	.requires = "res_audiosocket",
 );
