@@ -45,3 +45,31 @@ single-byte, bit-packed error codes:
   - `0x02` - frame forwarding error
   - `0x04` - memory (allocation) error
 
+## Asterisk usage
+
+There are two Asterisk implementations: a channel interface and a dialplan
+application interface.  Each of these lends itself to simplify a different
+use-case, but they work in exactly the same way.
+
+The following examples demonstrate an AudioSocket connection to a server at
+`server.example.com` running on TCP port 9092.  The UUID (which is chosen
+arbitrarily) of the call is `40325ec2-5efd-4bd3-805f-53576e581d13`.
+
+Dialplan application:
+
+```
+exten = 100,1,Verbose("Call to AudioSocket via Dialplan Application")
+ same = n,Answer()
+ same = n,AudioSocket(40325ec2-5efd-4bd3-805f-53576e581d13,server.example.com:9092)
+ same = n,Hangup()
+```
+
+Channel interface:
+
+```
+exten = 101,1,Verbose("Call to AudioSocket via Channel interface")
+ same = n,Answer()
+ same = n,Dial(AudioSocket/server.example.com:9092/40325ec2-5efd-4bd3-805f-53576e581d13)
+ same = n,Hangup()
+```
+
