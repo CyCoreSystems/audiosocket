@@ -123,7 +123,7 @@ func NextMessage(r io.Reader) (Message, error) {
 		return hdr, nil
 	}
 
-	payload := make([]byte, payloadLen, payloadLen)
+	payload := make([]byte, payloadLen)
 	n, err = r.Read(payload)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read payload")
