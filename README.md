@@ -8,6 +8,10 @@ audio streams.
 There exists a protocol definition (below), a Go library, and Asterisk
 application and channel interfaces.
 
+**NOTE:**  as of 2020-01-15, AudioSocket has been included in the upstream Asterisk
+system.  While I am leaving the Asterisk patches here for use with previous
+versions, the Asterisk code in this repository should be considered obsolete.
+
 ## Protocol definition
 
 The singular design goal of AudioSocket is to present the simplest possible
