@@ -11,6 +11,7 @@ application and channel interfaces.
 **NOTE:**  as of 2020-01-15, AudioSocket has been included in the upstream Asterisk
 system.  While I am leaving the Asterisk patches here for use with previous
 versions, the Asterisk code in this repository should be considered obsolete.
+The Go code is up-to-date, maintained, and this is the primary source for it.
 
 ## Protocol definition
 
