@@ -82,7 +82,7 @@ const int ast_audiosocket_send_frame(const int svc, const struct ast_frame *f);
  * \retval 0 on success
  * \retval -1 on error
  */
-const int ast_audiosocket_send_dtmf(const int svc, const int state, const char code);
+const int ast_audiosocket_send_dtmf(const int svc,  int state, char code, int duration);
   
   
   
