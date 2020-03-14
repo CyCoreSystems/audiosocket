@@ -67,6 +67,8 @@ static struct ast_channel_tech audiosocket_channel_tech = {
 	.hangup = audiosocket_hangup,
 	.read = audiosocket_read,
 	.write = audiosocket_write,
+	.send_digit_begin = audiosocket_senddigit_begin,
+        .send_digit_end = audiosocket_senddigit_end,
 };
 
 /*! \brief Function called when we should read a frame from the channel */
@@ -94,6 +96,33 @@ static int audiosocket_write(struct ast_channel *ast, struct ast_frame *f)
 	}
 	return ast_audiosocket_send_frame(instance->svc, f);
 }
+
+/*! \brief Function called when we should write a dtmf to the channel */
+static int audiosocket_senddigit_begin(struct ast_channel *ast, char digit)
+{
+	struct audiosocket_instance *instance;
+
+	/* The channel should always be present from the API */
+	instance = ast_channel_tech_pvt(ast);
+	if (instance == NULL || instance->svc < 1) {
+		return -1;
+	}
+	return ast_audiosocket_send_dtmf(instance->svc, 1, digit, 0);
+}
+	
+/*! \brief Function called when we should write a dtmf to the channel */
+static int audiosocket_senddigit_end(struct ast_channel *ast, char digit, unsigned int duration)
+{
+	struct audiosocket_instance *instance;
+
+	/* The channel should always be present from the API */
+	instance = ast_channel_tech_pvt(ast);
+	if (instance == NULL || instance->svc < 1) {
+		return -1;
+	}
+	return ast_audiosocket_send_dtmf(instance->svc, 0, digit, duration);
+}
+
 
 /*! \brief Function called when we should actually call the destination */
 static int audiosocket_call(struct ast_channel *ast, const char *dest, int timeout)
