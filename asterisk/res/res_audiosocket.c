@@ -229,7 +229,7 @@ const int ast_audiosocket_send_dtmf(const int svc, const int state, const char c
 	int ret = 0;
 	uint8_t kind = 0x02;	/* always 16-bit, 8kHz signed linear mono, for now */
 	uint8_t *p;
-	uint8_t buf[4];
+	uint8_t buf[5];
 	int datalen = 2;
 	p = buf;
 
@@ -239,7 +239,7 @@ const int ast_audiosocket_send_dtmf(const int svc, const int state, const char c
 	*(p++) = state & 0xff;
 	*(P++) = char;
 
-	if (write(svc, buf, 4) != 4) {
+	if (write(svc, buf, 5) != 5) {
 		ast_log(LOG_WARNING, "Failed to write data to AudioSocket\n");
 		ret = -1;
 	}
