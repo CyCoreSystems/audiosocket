@@ -6,7 +6,7 @@
 
 ###--希望能成功实现！
 
-###--It is planned to increase the transmission function of DTMF signals on the basis of the original AudioSocket. It will not actually generate and detect DTMF information. This function needs to be implemented at the other end of the network.
+###--It is planned to add the transmission function of DTMF signals on the basis of the original AudioSocket. It will not actually generate and detect DTMF information. This function needs to be implemented at the other end of the network.
 
 ###--Hope it can be achieved successfully!
 
