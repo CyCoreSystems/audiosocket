@@ -224,7 +224,7 @@ const int ast_audiosocket_send_frame(const int svc, const struct ast_frame *f)
 	return ret;
 }
 
-const int ast_audiosocket_send_dtmf(const int svc, const int state, const char code, int duration)
+const int ast_audiosocket_send_dtmf(const int svc,  int state, char code, int duration)
 {
 	int ret = 0;
 	uint8_t kind = 0x02;	/* always 16-bit, 8kHz signed linear mono, for now */
