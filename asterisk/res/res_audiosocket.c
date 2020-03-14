@@ -224,6 +224,29 @@ const int ast_audiosocket_send_frame(const int svc, const struct ast_frame *f)
 	return ret;
 }
 
+const int ast_audiosocket_send_dtmf(const int svc, const int state, const char code)
+{
+	int ret = 0;
+	uint8_t kind = 0x02;	/* always 16-bit, 8kHz signed linear mono, for now */
+	uint8_t *p;
+	uint8_t buf[4];
+	int datalen = 2;
+	p = buf;
+
+	*(p++) = kind;
+	*(p++) = f->datalen >> 8;
+	*(p++) = f->datalen & 0xff;
+	*(p++) = state & 0xff;
+	*(P++) = char;
+
+	if (write(svc, buf, 4) != 4) {
+		ast_log(LOG_WARNING, "Failed to write data to AudioSocket\n");
+		ret = -1;
+	}
+
+	return ret;
+}
+
 struct ast_frame *ast_audiosocket_receive_frame(const int svc)
 {
 
