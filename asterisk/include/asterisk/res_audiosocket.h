@@ -71,6 +71,21 @@ const int ast_audiosocket_init(const int svc, const char *id);
  */
 const int ast_audiosocket_send_frame(const int svc, const struct ast_frame *f);
 
+
+/*!
+ * \brief Send an Asterisk dtmf signal to an AudioSocket server
+ *
+ * \param svc The file descriptor of the network socket to the AudioSocket server.
+ * \param state 1:start dtmf, 0:end dtmf
+ * \param dtmf char code 1-9,*,#,A-D
+ *
+ * \retval 0 on success
+ * \retval -1 on error
+ */
+const int ast_audiosocket_send_dtmf(const int svc, const int state, const char code);
+  
+  
+  
 /*!
  * \brief Receive an Asterisk frame from an AudioSocket server
  *
