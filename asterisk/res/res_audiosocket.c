@@ -230,14 +230,13 @@ const int ast_audiosocket_send_dtmf(const int svc,  int state, char code, int du
 	uint8_t kind = 0x02;	/* always 16-bit, 8kHz signed linear mono, for now */
 	uint8_t *p;
 	uint8_t buf[9];
-	int datalen = 2;
 	p = buf;
 
 	*(p++) = kind;
-	*(p++) = f->datalen >> 8;
-	*(p++) = f->datalen & 0xff;
+	*(p++) = 0x00;
+	*(p++) = 0x06;
 	*(p++) = state & 0xff;
-	*(P++) = char;
+	*(p++) = code;
 	*(p++) = duration & 0xff;
 	*(p++) = (duration >> 8) & 0xff;
 	*(p++) = (duration >> 16) & 0xff;
@@ -261,6 +260,7 @@ struct ast_frame *ast_audiosocket_receive_frame(const int svc)
 		.src = "AudioSocket",
 		.mallocd = AST_MALLOCD_DATA,
 	};
+
 	uint8_t kind;
 	uint8_t len_high;
 	uint8_t len_low;
@@ -335,7 +335,13 @@ struct ast_frame *ast_audiosocket_receive_frame(const int svc)
 	}
 
 	if (not_audio) {
-		ast_free(data);
+		if ( kind == 0x02 && data[0] == 0x00) {
+			f.frametype = AST_FRAME_DTMF_END;
+			f.subclass.integer = data[1];
+			ast_free(data);
+			//ast_queue_frame(svc, &f);
+			return ast_frisolate(&f);
+		}
 		return &ast_null_frame;
 	}
 
@@ -366,3 +372,4 @@ AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_GLOBAL_SYMBOLS | AST_MODFLAG_LOAD_
 	.unload = unload_module,
 	.load_pri = AST_MODPRI_CHANNEL_DEPEND,
 );
+

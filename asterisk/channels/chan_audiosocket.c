@@ -57,6 +57,8 @@ static int audiosocket_call(struct ast_channel *ast, const char *dest, int timeo
 static int audiosocket_hangup(struct ast_channel *ast);
 static struct ast_frame *audiosocket_read(struct ast_channel *ast);
 static int audiosocket_write(struct ast_channel *ast, struct ast_frame *f);
+static int audiosocket_senddigit_begin(struct ast_channel *ast, char digit);
+static int audiosocket_senddigit_end(struct ast_channel *ast, char digit, unsigned int duration);
 
 /* AudioSocket channel driver declaration */
 static struct ast_channel_tech audiosocket_channel_tech = {
