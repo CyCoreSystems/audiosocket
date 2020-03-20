@@ -35,8 +35,9 @@ indication, for instance, is `0x00 0x00 0x00`.
 
   - `0x00` - Terminate the connection (socket closure is also sufficient)
   - `0x01` - Payload will contain the UUID (16-byte binary representation) for the audio stream
-  - `0x02` - Plyload is Dtmf start & stop signal, total 6 bytes. 1 byte state: 1:start dtmf, 0:stop dtmf; 1 byte code , 1-9, *, #, A-D; 
+  - `0x02` - Payload is Dtmf start & stop signal, total 6 bytes. 1 byte state: 1:start dtmf, 0:stop dtmf; 1 byte code , 1-9, *, #, A-D; 
   4 bytes int duration, little-endian (0 for dtmf begin)
+  - `0x03` - Payload is AST_CONTROL_(ANSWER RING BUSY HANGUP ....see frame.h ) base control signal, 1 byte.
   - `0x10` - Payload is signed linear, 16-bit, 8kHz, mono PCM (little-endian)
   - `0xff` - An error has occurred; payload is the (optional)
     application-specific error code.  Asterisk-generated error codes are listed

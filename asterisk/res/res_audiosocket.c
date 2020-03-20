@@ -335,13 +335,22 @@ struct ast_frame *ast_audiosocket_receive_frame(const int svc)
 	}
 
 	if (not_audio) {
+		//dtmf end
 		if ( kind == 0x02 && data[0] == 0x00) {
 			f.frametype = AST_FRAME_DTMF_END;
 			f.subclass.integer = data[1];
 			ast_free(data);
+			return ast_frisolate(&f);
+		}
+		//ast_control_xxxx
+		if ( kind == 0x03 ) {
+			f.frametype = AST_FRAME_CONTROL;
+			f.subclass.integer = data[0];
+			ast_free(data);
 			//ast_queue_frame(svc, &f);
 			return ast_frisolate(&f);
 		}
+
 		return &ast_null_frame;
 	}
 
@@ -372,4 +381,3 @@ AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_GLOBAL_SYMBOLS | AST_MODFLAG_LOAD_
 	.unload = unload_module,
 	.load_pri = AST_MODPRI_CHANNEL_DEPEND,
 );
-

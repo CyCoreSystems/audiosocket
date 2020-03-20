@@ -131,7 +131,7 @@ static int audiosocket_call(struct ast_channel *ast, const char *dest, int timeo
 {
 	struct audiosocket_instance *instance = ast_channel_tech_pvt(ast);
 
-	ast_queue_control(ast, AST_CONTROL_ANSWER);
+	ast_queue_control(ast, AST_CONTROL_RINGING);
 
 	return ast_audiosocket_init(instance->svc, instance->id);
 }
