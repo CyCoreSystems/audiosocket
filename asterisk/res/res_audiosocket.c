@@ -239,6 +239,7 @@ struct ast_frame *ast_audiosocket_receive_frame(const int svc)
 	uint8_t len_low;
 	uint16_t len = 0;
 	uint8_t *data;
+	uint8_t retry = 3;
 
 	n = read(svc, &kind, 1);
 	if (n < 0 && errno == EAGAIN) {
@@ -287,9 +288,18 @@ struct ast_frame *ast_audiosocket_receive_frame(const int svc)
 	ret = 0;
 	n = 0;
 	i = 0;
+	retry = 3;
 	while (i < len) {
 		n = read(svc, data + i, len - i);
 		if (n < 0) {
+			// Sometimes there is something to read but it's not ready
+			// i don't knnow if it's better to sleep for 5ms
+			if (retry > 0) {
+				ast_log(LOG_WARNING, "Failed to read data retry\n");
+				usleep(5000);
+				retry--;
+				continue;
+			}
 			ast_log(LOG_ERROR, "Failed to read data from AudioSocket\n");
 			ret = n;
 			break;
