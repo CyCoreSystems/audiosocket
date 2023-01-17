@@ -1,0 +1,22 @@
+name: tagger
+on:
+  push:
+    branches:
+      - "*"
+
+jobs:
+  tagger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Tag
+        run: |
+          VERSION_FILE=".version"
+          VERSION_VALUE=$(cat $VERSION_FILE)
+          MAX_BRANCH_LENGTH=40
+          FIXED_BRANCH=$(echo ${GITHUB_REF:11:${MAX_BRANCH_LENGTH}} | sed 's/[^[:alnum:]]/-/g')
+          NEW_TAG=$(echo "$VERSION_VALUE-${FIXED_BRANCH}.$(date +%Y%m%d-%H%M%S)")
+          git tag ${NEW_TAG}
+          git push origin ${NEW_TAG} --force
