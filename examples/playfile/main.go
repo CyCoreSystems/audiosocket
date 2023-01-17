@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/CyCoreSystems/audiosocket"
+	"github.com/pablodz/audiosocket"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 )

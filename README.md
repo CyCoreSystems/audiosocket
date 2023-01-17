@@ -1,6 +1,6 @@
 # AudioSocket
 
-[![](https://godoc.org/github.com/CyCoreSystems/audiosocket?status.svg)](http://godoc.org/github.com/CyCoreSystems/audiosocket)
+[![](https://godoc.org/github.com/pablodz/audiosocket?status.svg)](http://godoc.org/github.com/pablodz/audiosocket)
 
 AudioSocket is a simple TCP-based protocol for sending and receiving realtime
 audio streams.
