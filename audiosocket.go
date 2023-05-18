@@ -46,6 +46,9 @@ const (
 
 	// ErrAstMemory indicates that Asterisk had a memory/allocation erorr
 	ErrAstMemory = 0x04
+
+	// ErrUnknown indicates that the received error from Asterisk is unknown
+	ErrUnknown = 0xff
 )
 
 // ContentLength returns the length of the payload of the message
@@ -71,7 +74,10 @@ func (m Message) ErrorCode() ErrorCode {
 		return ErrNone
 	}
 
-	// FIXME: TBD
+	if len(m) < 4 {
+		return ErrUnknown
+	}
+
 	return ErrorCode(m[3])
 }
 
