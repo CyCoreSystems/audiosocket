@@ -30,6 +30,10 @@
 	<support_level>extended</support_level>
  ***/
 
+#ifndef AST_MODULE
+#define AST_MODULE "AudioSocket"
+#endif
+
 #include "asterisk.h"
 #include "errno.h"
 #include <uuid/uuid.h>
@@ -41,8 +45,8 @@
 #include "asterisk/res_audiosocket.h"
 #include "asterisk/utils.h"
 #include "asterisk/format_cache.h"
+#include "asterisk/autochan.h"
 
-#define AST_MODULE "app_audiosocket"
 #define AUDIOSOCKET_CONFIG "audiosocket.conf"
 #define MAX_CONNECT_TIMEOUT_MSEC 2000
 
@@ -69,40 +73,32 @@
 
 static const char app[] = "AudioSocket";
 
+struct audiosocket_data {
+	char* server;
+	char* idStr;
+	ast_callid callid;
+	struct ast_autochan *autochan;
+};
+
 static int audiosocket_run(struct ast_channel *chan, const char *id, const int svc);
 
-static int audiosocket_exec(struct ast_channel *chan, const char *data)
+static void *audiosocket_thread(void *obj)
 {
-	char *parse;
-	struct ast_format *readFormat, *writeFormat;
-	const char *chanName;
-	int res;
+	struct audiosocket_data *audiosocket_ds = obj;
+	struct ast_channel *chan = audiosocket_ds->autochan->chan;
 
-	AST_DECLARE_APP_ARGS(args,
-		AST_APP_ARG(idStr);
-		AST_APP_ARG(server);
-	);
 
 	int s = 0;
-	uuid_t uu;
+	struct ast_format *readFormat, *writeFormat;
+	const char *chanName =  ast_channel_name(audiosocket_ds->autochan->chan);
+	int res;
 
+	ast_module_unref(ast_module_info->self);
 
-	chanName = ast_channel_name(chan);
-
-	/* Parse and validate arguments */
-	parse = ast_strdupa(data);
-	AST_STANDARD_APP_ARGS(args, parse);
-	if (ast_strlen_zero(args.idStr)) {
-		ast_log(LOG_ERROR, "UUID is required\n");
-		return -1;
-	}
-	if (uuid_parse(args.idStr, uu)) {
-		ast_log(LOG_ERROR, "Failed to parse UUID '%s'\n", args.idStr);
-		return -1;
-	}
-	if ((s = ast_audiosocket_connect(args.server, chan)) < 0) {
+	if ((s = ast_audiosocket_connect(audiosocket_ds->server, chan)) < 0) {
 		/* The res module will already output a log message, so another is not needed */
-		return -1;
+		ast_log(LOG_ERROR, "Could not connect to audiosocket server\n");
+		return 0;
 	}
 
 	writeFormat = ao2_bump(ast_channel_writeformat(chan));
@@ -128,7 +124,7 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
 		return -1;
 	}
 
-	res = audiosocket_run(chan, args.idStr, s);
+	res = audiosocket_run(chan, audiosocket_ds->idStr, s);
 	/* On non-zero return, report failure */
 	if (res) {
 		/* Restore previous formats and close the connection */
@@ -154,6 +150,64 @@ static int audiosocket_exec(struct ast_channel *chan, const char *data)
 	ao2_ref(writeFormat, -1);
 	ao2_ref(readFormat, -1);
 
+	return 0;
+
+	return NULL;
+}
+
+static int launch_audiosocket_thread(struct ast_channel *chan, char* server, char* idStr) {
+	pthread_t thread;
+	struct audiosocket *audiosocket;
+	struct audiosocket_data *audiosocket_ds;
+	if (!(audiosocket_ds = ast_calloc(1, sizeof(*audiosocket_ds)))) {
+		return -1;
+	}
+	ast_verb(2, "Starting audiosocket thread\n");
+	audiosocket_ds->callid = ast_read_threadstorage_callid();
+	audiosocket_ds->server = ast_strdup( server );
+	audiosocket_ds->idStr = ast_strdup( idStr );
+	if (!(audiosocket_ds->autochan = ast_autochan_setup(chan))) {
+		return -1;
+	}
+
+	ast_verb(2, "Connection params server=%s idStr=%s\n", audiosocket_ds->server, audiosocket_ds->idStr);
+	return ast_pthread_create_detached_background(&thread, NULL, audiosocket_thread, audiosocket_ds);
+}
+
+static int audiosocket_exec(struct ast_channel *chan, const char *data)
+{
+	char *parse;
+	struct ast_format *readFormat, *writeFormat;
+	const char *chanName;
+	int res;
+
+	AST_DECLARE_APP_ARGS(args,
+		AST_APP_ARG(idStr);
+		AST_APP_ARG(server);
+	);
+
+	int s = 0;
+	uuid_t uu;
+
+	/* Parse and validate arguments */
+	parse = ast_strdupa(data);
+	AST_STANDARD_APP_ARGS(args, parse);
+	if (ast_strlen_zero(args.idStr)) {
+		ast_log(LOG_ERROR, "UUID is required\n");
+		return -1;
+	}
+	if (uuid_parse(args.idStr, uu)) {
+		ast_log(LOG_ERROR, "Failed to parse UUID '%s'\n", args.idStr);
+		return -1;
+	}
+
+
+	chanName = ast_channel_name(chan);
+	ast_verb(2, "Audiosocket was called\n");
+	if (launch_audiosocket_thread( chan, args.server, args.idStr )) {
+		ast_module_unref(ast_module_info->self);
+		return -1;
+	}
 	return 0;
 }
 
