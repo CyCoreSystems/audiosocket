@@ -268,6 +268,50 @@ static int audiosocket_run(struct ast_channel *chan, const char *id, int svc)
 	return 0;
 }
 
+static int manager_audiosocket(struct mansession *s, const struct message *m)
+{
+	struct ast_channel *c;
+	const char *name = astman_get_header(m, "Channel");
+	const char *action_id = astman_get_header(m, "ActionID");
+	const char *id = astman_get_header(m, "Id");
+	const char *server = astman_get_header(m, "Server");
+	int res;
+	char args[PATH_MAX];
+
+	if (ast_strlen_zero(name)) {
+		astman_send_error(s, m, "No channel specified");
+		return AMI_SUCCESS;
+	}
+
+	c = ast_channel_get_by_name(name);
+	if (!c) {
+		astman_send_error(s, m, "No such channel");
+		return AMI_SUCCESS;
+	}
+
+	snprintf(args, sizeof(args), "%s,%s", id, server);
+
+	res = audiosocket_exec(c, args);
+
+	if (res) {
+		ast_channel_unref(c);
+		astman_send_error(s, m, "Could not start Audiosocket");
+		return AMI_SUCCESS;
+	}
+
+	astman_append(s, "Response: Success\r\n");
+
+	if (!ast_strlen_zero(action_id)) {
+		astman_append(s, "ActionID: %s\r\n", action_id);
+	}
+
+	astman_append(s, "\r\n");
+
+	ast_channel_unref(c);
+
+	return AMI_SUCCESS;
+}
+
 static int unload_module(void)
 {
 	return ast_unregister_application(app);
@@ -275,7 +319,11 @@ static int unload_module(void)
 
 static int load_module(void)
 {
-	return ast_register_application_xml(app, audiosocket_exec);
+	int res;
+	res = ast_register_application_xml(app, audiosocket_exec);
+	res |= ast_manager_register_xml("Audiosocket", EVENT_FLAG_SYSTEM, manager_audiosocket);
+
+	return res;
 }
 
 AST_MODULE_INFO(
