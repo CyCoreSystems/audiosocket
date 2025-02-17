@@ -1,7 +1,0 @@
-{
-	global:
-		LINKER_SYMBOL_PREFIXast_audiosocket_connect;
-		LINKER_SYMBOL_PREFIXast_audiosocket_init;
-		LINKER_SYMBOL_PREFIXast_audiosocket_send_frame;
-		LINKER_SYMBOL_PREFIX*ast_audiosocket_receive_frame;
-};
