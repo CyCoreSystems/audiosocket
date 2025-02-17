@@ -74,7 +74,6 @@ Channel interface:
 ```
 exten = 101,1,Verbose("Call to AudioSocket via Channel interface")
  same = n,Answer()
- same = n,Dial(AudioSocket/server.example.com:9092/40325ec2-5efd-4bd3-805f-53576e581d13)
+ same = n,Dial(AudioSocket/server.example.com:9092/40325ec2-5efd-4bd3-805f-53576e581d13/c(slin))
  same = n,Hangup()
 ```
-
