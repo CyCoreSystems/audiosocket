@@ -156,6 +156,7 @@ func IDMessage(id uuid.UUID) Message {
 }
 
 // SlinMessage creates a new Message from signed linear audio data
+// If the input is larger than 65535 bytes, this function will panic.
 func SlinMessage(in []byte) Message {
 	if len(in) > 65535 {
 		panic("audiosocket: message too large")
