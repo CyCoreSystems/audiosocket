@@ -24,6 +24,9 @@ const (
 	// KindSilence indicates the presence of silence on the line
 	KindSilence = 0x02
 
+	// KindDTMF indicates the message contains DTMF data
+	KindDTMF = 0x03
+
 	// KindSlin indicates the message contains signed-linear audio data
 	KindSlin = 0x10
 

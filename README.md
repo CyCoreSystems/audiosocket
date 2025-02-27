@@ -8,10 +8,9 @@ audio streams.
 There exists a protocol definition (below), a Go library, and Asterisk
 application and channel interfaces.
 
-**NOTE:**  as of 2020-01-15, AudioSocket has been included in the upstream Asterisk
-system.  While I am leaving the Asterisk patches here for use with previous
-versions, the Asterisk code in this repository should be considered obsolete.
-The Go code is up-to-date, maintained, and this is the primary source for it.
+**NOTE:** [@florentchauveau](https://github.com/florentchauveau) has added [support for DTMF](https://github.com/florentchauveau/asterisk/commit/3d4633f25c1db62dc235bf44ba785700ec0e0476) 
+in the AudioSocket protocol. Here is the [patch](https://github.com/florentchauveau/asterisk/commit/3d4633f25c1db62dc235bf44ba785700ec0e0476.patch) 
+for Asterisk 22.X.
 
 ## Protocol definition
 
@@ -27,6 +26,7 @@ indication, for instance, is `0x00 0x00 0x00`.
 
   - `0x00` - Terminate the connection (socket closure is also sufficient)
   - `0x01` - Payload will contain the UUID (16-byte binary representation) for the audio stream
+  - `0x03` - Payload is 1 byte (ascii) DTMF (dual-tone multi-frequency) digit
   - `0x10` - Payload is signed linear, 16-bit, 8kHz, mono PCM (little-endian)
   - `0xff` - An error has occurred; payload is the (optional)
     application-specific error code.  Asterisk-generated error codes are listed

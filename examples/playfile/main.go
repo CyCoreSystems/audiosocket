@@ -98,7 +98,6 @@ func Handle(pCtx context.Context, c net.Conn) {
 		log.Println("failed to send audio to Asterisk:", err)
 	}
 	log.Println("completed audio send")
-	return
 }
 
 func processDataFromAsterisk(ctx context.Context, in io.Reader) {
@@ -117,6 +116,8 @@ func processDataFromAsterisk(ctx context.Context, in io.Reader) {
 			return
 		case audiosocket.KindError:
 			log.Println("error from audiosocket")
+		case audiosocket.KindDTMF:
+			log.Println("received DTMF: ", string(m.Payload()))
 		case audiosocket.KindSlin:
 			if m.ContentLength() < 1 {
 				log.Println("no audio data")
