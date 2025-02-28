@@ -116,12 +116,9 @@ func GetID(r io.Reader) (uuid.UUID, error) {
 func NextMessage(r io.Reader) (Message, error) {
 	hdr := make([]byte, 3)
 
-	n, err := r.Read(hdr)
+	_, err := io.ReadFull(r, hdr)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read header")
-	}
-	if n != 3 {
-		return nil, errors.Wrapf(err, "read wrong number of bytes (%d) for header", n)
 	}
 
 	payloadLen := binary.BigEndian.Uint16(hdr[1:])
@@ -130,12 +127,9 @@ func NextMessage(r io.Reader) (Message, error) {
 	}
 
 	payload := make([]byte, payloadLen)
-	n, err = r.Read(payload)
+	_, err = io.ReadFull(r, payload)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read payload")
-	}
-	if n != int(payloadLen) {
-		return nil, errors.Wrapf(err, "read wrong number of bytes (%d) for payload", n)
 	}
 
 	m := append(hdr, payload...)
