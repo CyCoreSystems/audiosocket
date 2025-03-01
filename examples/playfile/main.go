@@ -2,39 +2,31 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/CyCoreSystems/audiosocket"
-	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
 )
 
-// MaxCallDuration is the maximum amount of time to allow a call to be up before it is terminated.
-const MaxCallDuration = 2 * time.Minute
+// maxCallDuration is the maximum amount of time to allow a call to be up before it is terminated.
+const maxCallDuration = 2 * time.Minute
 
 const listenAddr = ":8080"
-const languageCode = "en-US"
 
 // slinChunkSize is the number of bytes which should be sent per Slin
 // audiosocket message.  Larger data will be chunked into this size for
 // transmission of the AudioSocket.
 //
 // This is based on 8kHz, 20ms, 16-bit signed linear.
-const slinChunkSize = 320 // 8000Hz * 20ms * 2 bytes
+const slinChunkSize = audiosocket.DefaultSlinChunkSize // 8000Hz * 20ms * 2 bytes
 
 var fileName string
-
 var audioData []byte
-
-func init() {
-}
-
-// ErrHangup indicates that the call should be terminated or has been terminated
-var ErrHangup = errors.New("Hangup")
 
 func main() {
 	var err error
@@ -45,7 +37,7 @@ func main() {
 	if fileName == "" {
 		fileName = "test.slin"
 	}
-	audioData, err = ioutil.ReadFile(fileName)
+	audioData, err = os.ReadFile(fileName)
 	if err != nil {
 		log.Fatalln("failed to read audio file:", err)
 	}
@@ -61,8 +53,13 @@ func main() {
 func Listen(ctx context.Context) error {
 	l, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		return errors.Wrapf(err, "failed to bind listener to socket %s", listenAddr)
+		return fmt.Errorf("failed to bind listener to socket %s: %w", listenAddr, err)
 	}
+
+	go func() {
+		<-ctx.Done()
+		l.Close()
+	}()
 
 	for {
 		conn, err := l.Accept()
@@ -77,7 +74,7 @@ func Listen(ctx context.Context) error {
 
 // Handle processes a call
 func Handle(pCtx context.Context, c net.Conn) {
-	ctx, cancel := context.WithTimeout(pCtx, MaxCallDuration)
+	ctx, cancel := context.WithTimeout(pCtx, maxCallDuration)
 
 	defer func() {
 		cancel()
@@ -85,7 +82,6 @@ func Handle(pCtx context.Context, c net.Conn) {
 		if _, err := c.Write(audiosocket.HangupMessage()); err != nil {
 			log.Println("failed to send hangup message:", err)
 		}
-
 	}()
 
 	id, err := audiosocket.GetID(c)
@@ -95,38 +91,22 @@ func Handle(pCtx context.Context, c net.Conn) {
 	}
 	log.Printf("processing call %s", id.String())
 
-	go processDataFromAsterisk(ctx, cancel, c)
+	go processDataFromAsterisk(ctx, c)
 
 	log.Println("sending audio")
-	if err = sendAudio(c, audioData); err != nil {
+	if err = sendAudio(ctx, c, audioData); err != nil {
 		log.Println("failed to send audio to Asterisk:", err)
 	}
 	log.Println("completed audio send")
-	return
 }
 
-func getCallID(c net.Conn) (uuid.UUID, error) {
-	m, err := audiosocket.NextMessage(c)
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	if m.Kind() != audiosocket.KindID {
-		return uuid.Nil, errors.Errorf("invalid message type %d getting CallID", m.Kind())
-	}
-
-	return uuid.FromBytes(m.Payload())
-}
-
-func processDataFromAsterisk(ctx context.Context, cancel context.CancelFunc, in io.Reader) {
+func processDataFromAsterisk(ctx context.Context, in io.Reader) {
 	var err error
 	var m audiosocket.Message
 
-	defer cancel()
-
 	for ctx.Err() == nil {
 		m, err = audiosocket.NextMessage(in)
-		if errors.Cause(err) == io.EOF {
+		if errors.Is(err, io.EOF) {
 			log.Println("audiosocket closed")
 			return
 		}
@@ -136,23 +116,31 @@ func processDataFromAsterisk(ctx context.Context, cancel context.CancelFunc, in 
 			return
 		case audiosocket.KindError:
 			log.Println("error from audiosocket")
+		case audiosocket.KindDTMF:
+			log.Println("received DTMF: ", string(m.Payload()))
 		case audiosocket.KindSlin:
 			if m.ContentLength() < 1 {
 				log.Println("no audio data")
 			}
+			// m.Payload() contains the received audio bytes
 		default:
 		}
 	}
 }
 
-func sendAudio(w io.Writer, data []byte) error {
-
+func sendAudio(ctx context.Context, w io.Writer, data []byte) error {
 	var i, chunks int
 
 	t := time.NewTicker(20 * time.Millisecond)
 	defer t.Stop()
 
 	for range t.C {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if i >= len(data) {
 			return nil
 		}
@@ -162,11 +150,11 @@ func sendAudio(w io.Writer, data []byte) error {
 			chunkLen = len(data) - i
 		}
 		if _, err := w.Write(audiosocket.SlinMessage(data[i : i+chunkLen])); err != nil {
-			return errors.Wrap(err, "failed to write chunk to audiosocket")
+			return fmt.Errorf("failed to write chunk to audiosocket: %w", err)
 		}
 		chunks++
 		i += chunkLen
-
 	}
+
 	return errors.New("ticker unexpectedly stopped")
 }
